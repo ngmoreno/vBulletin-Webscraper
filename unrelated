@@ -1,0 +1,112 @@
+
+# --------------------------------------------------------------------{ HEADER }
+# filename:     vBulletin_users.py
+# author:       Nathaniel Moreno
+# date:         9/7/15
+# description:
+#
+#///////////////////////////////////////////////////////////////////////////////
+
+from scrapy.spiders import vBulletin_constants
+
+from scrapy import Spider, Request, FormRequest
+from scrapy.loader import ItemLoader
+from vBulletinSpider.items import userItem
+
+#///////////////////////////////////////////////////////////////////////////////
+
+UNAME='navbar_username'
+PWORD='navbar_password'
+
+class vBulletinSpider(Spider):
+    
+        name = "vBulletinSpider_users"
+        
+        allowed_domains = [ DOMAIN ]
+        start_urls = [ LOGIN_URL+"/" ]
+        
+        def start_requests(self,response):
+                
+            #return FormRequest(response,formdata={UNAME:uname,PWORD:pword},callback=self.logged_in)
+            return Request(
+                url=URL_MEMBERLIST,
+                callback=self.logged_in,
+		# TODO: Enter session hash
+                cookies={'bbsessionhash':''} )
+        
+        # called if scrapemode 2 is set, after session cookie has been set
+        def logged_in(self, response):
+            result = self.confirm_login(response)
+            print(result)
+            if result == UNAME: return Request(URL_MEMBERLIST, self.parse_page_users)
+        
+        def confirm_login(self,response):
+            xpath_login_status={
+                "You are not logged in": '//table/tbody/tr[2]/td/div/div/form/div[1]/text()',
+                "You have entered an invalid username or password." :'//body/div/div/div/table/tbody/tr[2]/td/div/div/div/text()[1]',
+                UNAME :'//table/tbody/tr/td[2]/div/strong/a/text()' }
+            
+            for key in xpath_login_status.keys():
+                if key in response.xpath(xpath_logged[key]): return key
+
+
+#///////////////////////////////////////////////////////////////////////////////
+
+    def parse_page_users(self,response):
+    
+        ### Xpaths ###
+        xpath_user_id = '//tr[child::td[text()="Avatar"]]/following-sibling::tr/td/@id'
+        
+        # TODO : FINISH
+        xpath_next_page_url = '/@href'
+        
+        ### Extracting ###
+        user_ids        = response.xpath(xpath_user_id).extract()
+        next_page_url   = response.xpath(xpath_next_page_url).extract()
+        
+        ### Requests ###
+        for user_id in user_ids: yield Request(URL_USER+user_id, self.parse_user)
+        
+        if url_nextpage: yield Request(url_nextpage[0], self.parse_page_threads)
+
+
+#///////////////////////////////////////////////////////////////////////////////
+
+    def parse_user(self, response):
+    
+        ### Xpaths ###
+        path = '//dd[preceding-sibling::dt/text()="'
+        
+        extractor = {
+            'id_user'       : '',
+            'user_name'     : '//head/title/text()',
+            'user_title'    : '//td[@id="username_box"]/h2/text()',
+            'user_dob'      : path+'Date of Birth"][following-sibling::dt/text()="Join Date"]/text()',
+            'user_age'      : path+'Age"][following-sibling::dt/text()="Join Date"]/text()',
+            'user_joindate' : path+'Join Date"][following-sibling::dt/text()="Total Posts"]/text()',
+            'user_totalPosts':path+'Total Posts"][following-sibling::dt/text()="Wiki Contributions"]/text()',
+            'user_la_date'  : '//div[@id="last_online"]/span[text()="Last Activity:"]/following-sibling::text()',
+            'user_la_time'  : '//div[@id="last_online"]/span[text()="Last Activity:"]/following-sibling::span/text()',
+            'user_car'      : '//dt[text()="Car"]/following-sibling::dd[1]/text()',
+            'user_location' : '//dt[text()="Location"]/following-sibling::dd[1]/text()',
+            'user_avatar'   : '',
+            'user_sig'      : '',
+            'user_friends'  : '//ul[@id="friends_list_big"]//a[@class="bigusername"]//text()',
+            'user_groups'   : '//ul[@id="social_group_list"]/li/div/div/a/text()',
+            'user_referrals': '//span[text()="Referrals:"]/following-sibling::text()',
+            'user_visitors' : '//div[@id="visitors"]/div/div/ol/li/a/text()',
+            'user_page_visits':'//div[@id="visitors"]/div/div/strong/text()',
+            'user_rating'   : '//td[descendent::text()="iTrader Rating:"]/following-sibling/strong/text()',
+            'user_positive' : '//td[descendent::contains()="positive:"]/following-sibling/text()',
+            'user_negative' : '//td[descendent::contains()="positive:"]/following-sibling/text()',
+            'user_homepage' : '',
+            'user_msn'      : '',
+            'user_skype'    : '',
+            'user_aim'      : '',
+            'user_yahoo'    : '',
+            'user_icq'      : ''
+            }
+        
+        ### Itemloading ###
+        yield insert_all1(response, extractor, ItemLoader(userItem)).load_item()
+
